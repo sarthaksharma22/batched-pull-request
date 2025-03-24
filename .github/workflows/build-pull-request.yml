@@ -1,0 +1,103 @@
+name: GitHub PR Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      sprint_name:
+        description: "Sprint Name"
+        required: true
+      repositories:
+        description: "Comma-separated list of repositories"
+        required: true
+
+jobs:
+  validate-inputs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Sprint Name
+        run: |
+          if [[ -z "${{ github.event.inputs.sprint_name }}" ]]; then
+            echo "❌ Sprint Name is required!"
+            exit 1
+          fi
+          echo "✅ Sprint Name: ${{ github.event.inputs.sprint_name }}"
+
+  process-repos:
+    runs-on: ubuntu-latest
+    needs: validate-inputs
+    steps:
+      - name: Setup Environment
+        run: |
+          echo "${{ github.event.inputs.repositories }}" > repos
+          tr ',' '\n' < repos > repo-list
+          cat repo-list
+
+      - name: Process Each Repository
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          SPRINT_NAME: ${{ github.event.inputs.sprint_name }}
+        run: |
+          while read REPOSITORY; do 
+            echo "Processing repository: $REPOSITORY"
+
+            git clone https://x-access-token:${GH_TOKEN}@github.com/$REPOSITORY.git
+            cd $(basename "$REPOSITORY")
+
+            git fetch origin develop
+            git checkout develop
+            git pull origin develop
+
+            latest_commit=$(git rev-parse HEAD)
+
+            git tag "$SPRINT_NAME" $latest_commit
+            release_branch="release-$(date +%Y%m%d)"
+            git checkout -b $release_branch $latest_commit
+            git push origin $release_branch --tags
+
+            cd ..
+          done < repo-list
+
+  create-pr:
+    runs-on: ubuntu-latest
+    needs: process-repos
+    steps:
+      - name: Create Pull Requests
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          while read REPOSITORY; do 
+            release_branch="release-$(date +%Y%m%d)"
+            REPO_NAME=$(basename "$REPOSITORY")
+
+            PR_RESPONSE=$(curl --request POST --url "https://api.github.com/repos/$REPOSITORY/pulls" \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header "Accept: application/vnd.github.v3+json" \
+              --data '{
+                "title": "'"${release_branch}"'",
+                "head": "'"${release_branch}"'",
+                "base": "master",
+                "body": "Auto-created PR for sprint release"
+              }')
+
+            echo "PR Created: $PR_RESPONSE"
+
+          done < repo-list
+
+  list-prs:
+    runs-on: ubuntu-latest
+    needs: create-pr
+    steps:
+      - name: Fetch PRs
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          while read REPOSITORY; do 
+            release_branch="release-$(date +%Y%m%d)"
+
+            echo "Fetching PRs for $REPOSITORY..."
+            curl --request GET --url "https://api.github.com/repos/$REPOSITORY/pulls" \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header "Accept: application/vnd.github.v3+json" | \
+              jq -r '.[] | select(.head.ref == "'"${release_branch}"'") | select(.base.ref == "master") | .html_url'
+
+          done < repo-list
