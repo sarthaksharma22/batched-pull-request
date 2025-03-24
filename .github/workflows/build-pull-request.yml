@@ -28,7 +28,7 @@ jobs:
     steps:
       - name: Build Selected Repository List
         run: |
-          echo "" > repo-list
+          echo "python-json" > repo-list  # Ensure python-json is processed first
           [[ "${{ github.event.inputs.repo1 }}" == "true" ]] && echo "org/repo1" >> repo-list
           [[ "${{ github.event.inputs.repo2 }}" == "true" ]] && echo "org/repo2" >> repo-list
           [[ "${{ github.event.inputs.repo3 }}" == "true" ]] && echo "org/repo3" >> repo-list
