@@ -3,9 +3,15 @@ name: GitHub PR Pipeline
 on:
   workflow_dispatch:
     inputs:
-      repositories:
-        description: "JSON array of repositories"
-        required: true
+      repo1:
+        description: "Enable for org/repo1"
+        type: boolean
+      repo2:
+        description: "Enable for org/repo2"
+        type: boolean
+      repo3:
+        description: "Enable for org/repo3"
+        type: boolean
       tag_name:
         description: "Tag name to apply"
         required: true
@@ -20,10 +26,14 @@ jobs:
   process-repos:
     runs-on: ubuntu-latest
     steps:
-      - name: Convert JSON array to file
+      - name: Build Selected Repository List
         run: |
-          echo '${{ github.event.inputs.repositories }}' | jq -r '.[]' > repo-list
-          echo "📂 Repository list:"
+          echo "" > repo-list
+          [[ "${{ github.event.inputs.repo1 }}" == "true" ]] && echo "org/repo1" >> repo-list
+          [[ "${{ github.event.inputs.repo2 }}" == "true" ]] && echo "org/repo2" >> repo-list
+          [[ "${{ github.event.inputs.repo3 }}" == "true" ]] && echo "org/repo3" >> repo-list
+
+          echo "📂 Selected repositories:"
           cat repo-list
 
       - name: Process Each Repository
@@ -68,3 +78,4 @@ jobs:
 
             cd ..
           done < repo-list
+ 
