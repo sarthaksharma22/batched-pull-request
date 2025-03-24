@@ -3,142 +3,68 @@ name: GitHub PR Pipeline
 on:
   workflow_dispatch:
     inputs:
-      sprint_name:
-        description: "Sprint Name"
-        required: true
-      option1:
-        description: "Enable Option 1"
-        type: boolean
-      option2:
-        description: "Enable Option 2"
-        type: boolean
-      option3:
-        description: "Enable Option 3"
-        type: boolean
       repositories:
-        description: "Comma-separated list of repositories (Required if Option 1 or 2 is enabled)"
-        required: false
+        description: "JSON array of repositories"
+        required: true
+      tag_name:
+        description: "Tag name to apply"
+        required: true
+      release:
+        description: "Create a release branch"
+        type: boolean
+      hotfix:
+        description: "Create a hotfix branch"
+        type: boolean
 
 jobs:
-  validate-inputs:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Validate Sprint Name
-        run: |
-          if [[ -z "${{ github.event.inputs.sprint_name }}" ]]; then
-            echo "❌ Sprint Name is required!"
-            exit 1
-          fi
-          echo "✅ Sprint Name: ${{ github.event.inputs.sprint_name }}"
-
-      - name: Validate Repository List (if option1 or option2 is enabled)
-        run: |
-          if [[ "${{ github.event.inputs.option1 }}" == "true" || "${{ github.event.inputs.option2 }}" == "true" ]]; then
-            if [[ -z "${{ github.event.inputs.repositories }}" ]]; then
-              echo "❌ Repositories input is required when Option 1 or Option 2 is enabled!"
-              exit 1
-            fi
-          fi
-          echo "✅ Repository validation passed."
-
   process-repos:
     runs-on: ubuntu-latest
-    needs: validate-inputs
-    if: ${{ github.event.inputs.option1 || github.event.inputs.option2 }}
     steps:
-      - name: Setup Environment
+      - name: Convert JSON array to file
         run: |
-          echo "${{ github.event.inputs.repositories }}" > repos
-          tr ',' '\n' < repos > repo-list
+          echo '${{ github.event.inputs.repositories }}' | jq -r '.[]' > repo-list
+          echo "📂 Repository list:"
           cat repo-list
 
-      - name: Checkout and Process Repositories
+      - name: Process Each Repository
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          SPRINT_NAME: ${{ github.event.inputs.sprint_name }}
+          TAG_NAME: ${{ github.event.inputs.tag_name }}
+          RELEASE: ${{ github.event.inputs.release }}
+          HOTFIX: ${{ github.event.inputs.hotfix }}
         run: |
           while read REPOSITORY; do 
             echo "🚀 Processing repository: $REPOSITORY"
 
-            # Clone repository
             git clone https://x-access-token:${GH_TOKEN}@github.com/$REPOSITORY.git
             cd $(basename "$REPOSITORY")
 
-            # Fetch the latest commit from develop
             git fetch origin develop
             git checkout develop
             git pull origin develop
 
             latest_commit=$(git rev-parse HEAD)
 
-            # Tag the latest commit
-            git tag "$SPRINT_NAME" $latest_commit
-            release_branch="release-$(date +%Y%m%d)"
-            
-            # Create and push the release branch
-            git checkout -b $release_branch $latest_commit
-            git push origin $release_branch --tags
+            # Apply Tag
+            git tag "$TAG_NAME" $latest_commit
+            git push origin --tags
+            echo "✅ Tagged latest commit with $TAG_NAME"
+
+            # Create Release Branch
+            if [[ "$RELEASE" == "true" ]]; then
+              release_branch="release-$(date +%Y%m%d)"
+              git checkout -b $release_branch $latest_commit
+              git push origin $release_branch
+              echo "🚀 Created release branch: $release_branch"
+            fi
+
+            # Create Hotfix Branch
+            if [[ "$HOTFIX" == "true" ]]; then
+              hotfix_branch="hotfix-$(date +%Y%m%d)"
+              git checkout -b $hotfix_branch $latest_commit
+              git push origin $hotfix_branch
+              echo "🔥 Created hotfix branch: $hotfix_branch"
+            fi
 
             cd ..
-          done < repo-list
-
-  create-pr:
-    runs-on: ubuntu-latest
-    needs: process-repos
-    if: ${{ github.event.inputs.option2 }}
-    steps:
-      - name: Create Pull Requests
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          SPRINT_NAME: ${{ github.event.inputs.sprint_name }}
-        run: |
-          while read REPOSITORY; do 
-            release_branch="release-$(date +%Y%m%d)"
-            echo "📌 Creating PR for $REPOSITORY..."
-
-            PR_RESPONSE=$(curl --silent --request POST --url "https://api.github.com/repos/$REPOSITORY/pulls" \
-              --header "Authorization: Bearer ${GH_TOKEN}" \
-              --header "Accept: application/vnd.github.v3+json" \
-              --data '{
-                "title": "'"$SPRINT_NAME - $release_branch"'",
-                "head": "'"$release_branch"'",
-                "base": "master",
-                "body": "Auto-created PR for sprint release"
-              }')
-
-            PR_URL=$(echo "$PR_RESPONSE" | jq -r '.html_url')
-            if [[ "$PR_URL" == "null" ]]; then
-              echo "❌ Failed to create PR for $REPOSITORY"
-              echo "$PR_RESPONSE"
-            else
-              echo "✅ PR Created: $PR_URL"
-            fi
-
-          done < repo-list
-
-  list-prs:
-    runs-on: ubuntu-latest
-    needs: create-pr
-    if: ${{ github.event.inputs.option3 }}
-    steps:
-      - name: Fetch and List PRs
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          while read REPOSITORY; do 
-            release_branch="release-$(date +%Y%m%d)"
-            echo "🔎 Fetching PRs for $REPOSITORY..."
-
-            PR_LIST=$(curl --silent --request GET --url "https://api.github.com/repos/$REPOSITORY/pulls" \
-              --header "Authorization: Bearer ${GH_TOKEN}" \
-              --header "Accept: application/vnd.github.v3+json" | \
-              jq -r '.[] | select(.head.ref == "'"${release_branch}"'") | select(.base.ref == "master") | .html_url')
-
-            if [[ -z "$PR_LIST" ]]; then
-              echo "❌ No PRs found for $release_branch in $REPOSITORY"
-            else
-              echo "✅ PRs Found:"
-              echo "$PR_LIST"
-            fi
-
           done < repo-list
