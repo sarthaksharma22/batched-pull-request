@@ -38,7 +38,7 @@ jobs:
 
       - name: Process Each Repository
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ github.event.inputs.tag_name }}
           RELEASE: ${{ github.event.inputs.release }}
           HOTFIX: ${{ github.event.inputs.hotfix }}
