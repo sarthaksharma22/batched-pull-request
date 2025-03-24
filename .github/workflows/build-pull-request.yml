@@ -4,13 +4,12 @@ name: GitHub PR Pipeline
 on:
   workflow_dispatch:
     inputs:
-      name:
-        type: multi-choice
-        description: select packages
-        options: 
-        - go-service1
-        - go-service2
-        - py-service1
+      option1:
+        type: boolean
+      option2:
+        type: boolean
+      option3:
+        type: boolean
 # on:
 #   workflow_dispatch:
 #     inputs:
