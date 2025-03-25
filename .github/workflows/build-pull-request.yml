@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
     inputs:
       python-json:
-        # description: "Enter repository name (org/repo1)"
         type: boolean
       repo2:
         description: "Enable for repo2"
@@ -29,10 +28,10 @@ jobs:
       - name: Build Selected Repository List
         run: |
           echo "" > repo-list
-          [[ -n "${{ github.event.inputs.repo1 }}" ]] && echo "${{ github.event.inputs.repo1 }}" >> repo-list
+          [[ "${{ github.event.inputs.python-json }}" == "true" ]] && echo "${{ vars.REPO_NAME_1 }}" >> repo-list
           [[ "${{ github.event.inputs.repo2 }}" == "true" ]] && echo "${{ vars.REPO_NAME_2 }}" >> repo-list
           [[ "${{ github.event.inputs.repo3 }}" == "true" ]] && echo "${{ vars.REPO_NAME_3 }}" >> repo-list
-
+          
           echo "📂 Selected repositories:"
           cat repo-list
 
@@ -45,7 +44,6 @@ jobs:
         run: |
           while read -r REPOSITORY; do 
             [[ -z "$REPOSITORY" ]] && continue
-
             echo "🚀 Processing repository: $REPOSITORY"
 
             # Clone the repository
@@ -72,6 +70,13 @@ jobs:
               git checkout -b "$release_branch" "$latest_commit"
               git push origin "$release_branch"
               echo "🚀 Created release branch: $release_branch"
+
+              # Create PR for Release Branch
+              gh pr create --repo "$REPOSITORY" \
+                --head "$release_branch" --base develop \
+                --title "Release: $release_branch" \
+                --body "This is an automated release PR for $release_branch" \
+                --assignee "${{ github.actor }}"
             fi
 
             # Create Hotfix Branch
@@ -80,6 +85,13 @@ jobs:
               git checkout -b "$hotfix_branch" "$latest_commit"
               git push origin "$hotfix_branch"
               echo "🔥 Created hotfix branch: $hotfix_branch"
+
+              # Create PR for Hotfix Branch
+              gh pr create --repo "$REPOSITORY" \
+                --head "$hotfix_branch" --base develop \
+                --title "Hotfix: $hotfix_branch" \
+                --body "This is an automated hotfix PR for $hotfix_branch" \
+                --assignee "${{ github.actor }}"
             fi
 
             cd ..
