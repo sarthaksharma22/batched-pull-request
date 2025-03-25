@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       python-json:
-        description: "Enable for org/repo1"
+        description: "Enter repository name (org/repo1)"
         type: string
       repo2:
-        description: "Enable for org/repo2"
+        description: "Enable for repo2"
         type: boolean
       repo3:
-        description: "Enable for org/repo3"
+        description: "Enable for repo3"
         type: boolean
       tag_name:
         description: "Tag name to apply"
@@ -26,24 +26,12 @@ jobs:
   process-repos:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch repository names from repository variables
-        id: fetch_repos
-        run: |
-          echo "Fetching repo names from repository variables..."
-          python-json=${{ github.event.inputs.my_value }}
-          REPO_NAME_2=${{ github.repository_variables.REPO_NAME_2 }}
-          REPO_NAME_3=${{ github.repository_variables.REPO_NAME_3 }}  # If you have a third variable
-          echo "Repository names fetched: $REPO_NAME_1, $REPO_NAME_2, $REPO_NAME_3"
-          echo "REPO_NAME_1=$REPO_NAME_1" >> $GITHUB_ENV
-          echo "REPO_NAME_2=$REPO_NAME_2" >> $GITHUB_ENV
-          echo "REPO_NAME_3=$REPO_NAME_3" >> $GITHUB_ENV
-
       - name: Build Selected Repository List
         run: |
           echo "" > repo-list
-          [[ "${{ github.event.inputs.repo1 }}" == "true" ]] && echo "$REPO_NAME_1" >> repo-list
-          [[ "${{ github.event.inputs.repo2 }}" == "true" ]] && echo "$REPO_NAME_2" >> repo-list
-          [[ "${{ github.event.inputs.repo3 }}" == "true" ]] && echo "$REPO_NAME_3" >> repo-list
+          [[ -n "${{ github.event.inputs.python-json }}" ]] && echo "${{ github.event.inputs.python-json }}" >> repo-list
+          [[ "${{ github.event.inputs.repo2 }}" == "true" ]] && echo "${{ vars.REPO_NAME_2 }}" >> repo-list
+          [[ "${{ github.event.inputs.repo3 }}" == "true" ]] && echo "${{ vars.REPO_NAME_3 }}" >> repo-list
 
           echo "📂 Selected repositories:"
           cat repo-list
@@ -55,12 +43,15 @@ jobs:
           RELEASE: ${{ github.event.inputs.release }}
           HOTFIX: ${{ github.event.inputs.hotfix }}
         run: |
-          while read REPOSITORY; do 
+          while read -r REPOSITORY; do 
+            [[ -z "$REPOSITORY" ]] && continue
+
             echo "🚀 Processing repository: $REPOSITORY"
 
             # Clone the repository
             git clone https://x-access-token:${GH_TOKEN}@github.com/$REPOSITORY.git
-            cd $(basename "$REPOSITORY")
+            REPO_NAME=$(basename "$REPOSITORY")
+            cd "$REPO_NAME"
 
             # Ensure we're working with the latest develop branch
             git fetch origin develop
@@ -71,23 +62,23 @@ jobs:
             latest_commit=$(git rev-parse HEAD)
 
             # Apply Tag
-            git tag "$TAG_NAME" $latest_commit
+            git tag "$TAG_NAME" "$latest_commit"
             git push origin --tags
             echo "✅ Tagged latest commit with $TAG_NAME"
 
             # Create Release Branch
             if [[ "$RELEASE" == "true" ]]; then
               release_branch="release-$(date +%Y%m%d)"
-              git checkout -b $release_branch $latest_commit
-              git push origin $release_branch
+              git checkout -b "$release_branch" "$latest_commit"
+              git push origin "$release_branch"
               echo "🚀 Created release branch: $release_branch"
             fi
 
             # Create Hotfix Branch
             if [[ "$HOTFIX" == "true" ]]; then
               hotfix_branch="hotfix-$(date +%Y%m%d)"
-              git checkout -b $hotfix_branch $latest_commit
-              git push origin $hotfix_branch
+              git checkout -b "$hotfix_branch" "$latest_commit"
+              git push origin "$hotfix_branch"
               echo "🔥 Created hotfix branch: $hotfix_branch"
             fi
 
