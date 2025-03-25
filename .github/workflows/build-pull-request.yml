@@ -5,7 +5,7 @@ on:
     inputs:
       python-json:
         description: "Enter repository name (org/repo1)"
-        type: string
+        type: boolean
       repo2:
         description: "Enable for repo2"
         type: boolean
