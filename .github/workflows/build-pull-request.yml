@@ -1,12 +1,12 @@
 name: GitHub PR Pipeline
 
-on:
-  workflow_dispatch:
-    inputs:
-      python-json:
-        description: "Enter repository name (org/repo1)"
-        type: boolean
-        default: name: GitHub PR Pipeline
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       python-json:
+#         description: "Enter repository name (org/repo1)"
+#         type: boolean
+#         default: name: GitHub PR Pipeline 
 
 on:
   workflow_dispatch:
