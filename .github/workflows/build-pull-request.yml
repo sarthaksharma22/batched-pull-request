@@ -26,12 +26,24 @@ jobs:
   process-repos:
     runs-on: ubuntu-latest
     steps:
+      - name: Fetch repository names from secrets
+        id: fetch_repos
+        run: |
+          echo "Fetching repo names..."
+          REPO_NAME_1=${{ secrets.REPO_NAME_1 }}
+          REPO_NAME_2=${{ secrets.REPO_NAME_2 }}
+          REPO_NAME_3=${{ secrets.REPO_NAME_3 }}  # If you have a third secret
+          echo "Repository names fetched: $REPO_NAME_1, $REPO_NAME_2, $REPO_NAME_3"
+          echo "REPO_NAME_1=$REPO_NAME_1" >> $GITHUB_ENV
+          echo "REPO_NAME_2=$REPO_NAME_2" >> $GITHUB_ENV
+          echo "REPO_NAME_3=$REPO_NAME_3" >> $GITHUB_ENV
+
       - name: Build Selected Repository List
         run: |
-          echo "python-json" > repo-list  # Ensure python-json is processed first
-          [[ "${{ github.event.inputs.repo1 }}" == "true" ]] && echo "org/repo1" >> repo-list
-          [[ "${{ github.event.inputs.repo2 }}" == "true" ]] && echo "org/repo2" >> repo-list
-          [[ "${{ github.event.inputs.repo3 }}" == "true" ]] && echo "org/repo3" >> repo-list
+          echo "" > repo-list
+          [[ "${{ github.event.inputs.repo1 }}" == "true" ]] && echo "$REPO_NAME_1" >> repo-list
+          [[ "${{ github.event.inputs.repo2 }}" == "true" ]] && echo "$REPO_NAME_2" >> repo-list
+          [[ "${{ github.event.inputs.repo3 }}" == "true" ]] && echo "$REPO_NAME_3" >> repo-list
 
           echo "📂 Selected repositories:"
           cat repo-list
@@ -46,13 +58,16 @@ jobs:
           while read REPOSITORY; do 
             echo "🚀 Processing repository: $REPOSITORY"
 
+            # Clone the repository
             git clone https://x-access-token:${GH_TOKEN}@github.com/$REPOSITORY.git
             cd $(basename "$REPOSITORY")
 
+            # Ensure we're working with the latest develop branch
             git fetch origin develop
             git checkout develop
             git pull origin develop
 
+            # Get the latest commit hash
             latest_commit=$(git rev-parse HEAD)
 
             # Apply Tag
@@ -78,4 +93,3 @@ jobs:
 
             cd ..
           done < repo-list
- 
