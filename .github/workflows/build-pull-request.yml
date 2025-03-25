@@ -3,9 +3,9 @@ name: GitHub PR Pipeline
 on:
   workflow_dispatch:
     inputs:
-      repo1:
+      python-json:
         description: "Enable for org/repo1"
-        type: boolean
+        type: string
       repo2:
         description: "Enable for org/repo2"
         type: boolean
@@ -30,7 +30,7 @@ jobs:
         id: fetch_repos
         run: |
           echo "Fetching repo names from repository variables..."
-          REPO_NAME_1=${{ github.repository_variables.REPO_NAME_1 }}
+          python-json=${{ github.event.inputs.my_value }}
           REPO_NAME_2=${{ github.repository_variables.REPO_NAME_2 }}
           REPO_NAME_3=${{ github.repository_variables.REPO_NAME_3 }}  # If you have a third variable
           echo "Repository names fetched: $REPO_NAME_1, $REPO_NAME_2, $REPO_NAME_3"
