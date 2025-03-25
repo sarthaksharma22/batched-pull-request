@@ -3,7 +3,7 @@ name: GitHub PR Pipeline
 on:
   workflow_dispatch:
     inputs:
-      python-json:
+      aws-three-tier-web-architecture-workshop:
         type: boolean
       repo2:
         description: "Enable for repo2"
@@ -28,7 +28,7 @@ jobs:
       - name: Build Selected Repository List
         run: |
           echo "" > repo-list
-          [[ "${{ github.event.inputs.python-json }}" == "true" ]] && echo "${{ vars.REPO_NAME_1 }}" >> repo-list
+          [[ "${{ github.event.inputs.aws-three-tier-web-architecture-workshop }}" == "true" ]] 
           [[ "${{ github.event.inputs.repo2 }}" == "true" ]] && echo "${{ vars.REPO_NAME_2 }}" >> repo-list
           [[ "${{ github.event.inputs.repo3 }}" == "true" ]] && echo "${{ vars.REPO_NAME_3 }}" >> repo-list
           
