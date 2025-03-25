@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       aws-three-tier-web-architecture-workshop:
+        description: "Enable for aws-three-tier-web-architecture-workshop"
         type: boolean
       repo2:
         description: "Enable for repo2"
@@ -20,7 +21,7 @@ on:
       hotfix:
         description: "Create a hotfix branch"
         type: boolean
-        
+
 permissions:
   contents: write
   pull-requests: write
@@ -29,15 +30,23 @@ jobs:
   process-repos:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
       - name: Build Selected Repository List
         run: |
           echo "" > repo-list
-          [[ "${{ github.event.inputs.aws-three-tier-web-architecture-workshop }}" == "true" ]] 
+          [[ "${{ github.event.inputs.aws-three-tier-web-architecture-workshop }}" == "true" ]] && echo "${{ vars.REPO_NAME_1 }}" >> repo-list
           [[ "${{ github.event.inputs.repo2 }}" == "true" ]] && echo "${{ vars.REPO_NAME_2 }}" >> repo-list
           [[ "${{ github.event.inputs.repo3 }}" == "true" ]] && echo "${{ vars.REPO_NAME_3 }}" >> repo-list
           
           echo "📂 Selected repositories:"
           cat repo-list
+
+      - name: Authenticate GitHub CLI
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh auth status
 
       - name: Process Each Repository
         env:
@@ -50,15 +59,20 @@ jobs:
             [[ -z "$REPOSITORY" ]] && continue
             echo "🚀 Processing repository: $REPOSITORY"
 
-            # Clone the repository
+            # Clone the private repository
             git clone https://x-access-token:${GH_TOKEN}@github.com/$REPOSITORY.git
+            if [[ $? -ne 0 ]]; then
+              echo "❌ Failed to clone $REPOSITORY. Check permissions and repository access."
+              continue
+            fi
+
             REPO_NAME=$(basename "$REPOSITORY")
-            cd "$REPO_NAME"
+            cd "$REPO_NAME" || exit
 
             # Ensure we're working with the latest develop branch
-            git fetch origin develop
-            git checkout develop
-            git pull origin develop
+            git fetch origin develop || echo "⚠️ No develop branch found, skipping checkout."
+            git checkout develop 2>/dev/null || echo "⚠️ Failed to checkout develop branch, skipping."
+            git pull origin develop || echo "⚠️ Failed to pull latest develop branch."
 
             # Get the latest commit hash
             latest_commit=$(git rev-parse HEAD)
@@ -80,7 +94,7 @@ jobs:
                 --head "$release_branch" --base develop \
                 --title "Release: $release_branch" \
                 --body "This is an automated release PR for $release_branch" \
-                --assignee "${{ github.actor }}"
+                --assignee "${{ github.actor }}" || echo "❌ PR creation failed for $release_branch"
             fi
 
             # Create Hotfix Branch
@@ -95,7 +109,7 @@ jobs:
                 --head "$hotfix_branch" --base develop \
                 --title "Hotfix: $hotfix_branch" \
                 --body "This is an automated hotfix PR for $hotfix_branch" \
-                --assignee "${{ github.actor }}"
+                --assignee "${{ github.actor }}" || echo "❌ PR creation failed for $hotfix_branch"
             fi
 
             cd ..
