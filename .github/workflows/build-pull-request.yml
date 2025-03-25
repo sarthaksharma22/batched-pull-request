@@ -20,6 +20,10 @@ on:
       hotfix:
         description: "Create a hotfix branch"
         type: boolean
+        
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   process-repos:
