@@ -5,7 +5,7 @@ on:
     inputs:
       selected_repos:
         description: "Select repositories"
-        type: string
+        type: boolean
       tag_name:
         description: "Tag name to apply"
         required: true
