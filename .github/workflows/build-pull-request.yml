@@ -36,7 +36,7 @@ jobs:
       - name: Build Selected Repository List
         run: |
           echo "" > repo-list
-          [[ "${{ github.event.inputs.aws-three-tier-web-architecture-workshop }}" == "true" ]] && echo "${{ vars.REPO_NAME_1 }}" >> repo-list
+          [[ "${{ github.event.inputs.aws-three-tier-web-architecture-workshop }}" == "true" ]] 
           [[ "${{ github.event.inputs.repo2 }}" == "true" ]] && echo "${{ vars.REPO_NAME_2 }}" >> repo-list
           [[ "${{ github.event.inputs.repo3 }}" == "true" ]] && echo "${{ vars.REPO_NAME_3 }}" >> repo-list
           
