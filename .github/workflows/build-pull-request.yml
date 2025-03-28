@@ -38,7 +38,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          echo "${GH_TOKEN}" | gh auth login --with-token
+          gh auth logout --hostname github.com || true
+          echo "${GH_TOKEN}" | gh auth login --with-token || exit 1
           gh auth status
 
       - name: Clone Repository
@@ -57,10 +58,15 @@ jobs:
           REPO_NAME=$(basename "${{ github.event.inputs.repo_name }}")
           cd $REPO_NAME
 
-          # Ensure develop branch is checked out and up to date
-          git fetch origin develop || echo "⚠️ No develop branch found, skipping checkout."
-          git checkout develop 2>/dev/null || echo "⚠️ Failed to checkout develop branch, skipping."
-          git pull origin develop || echo "⚠️ Failed to pull latest develop branch."
+          # Ensure develop branch exists
+          if git ls-remote --heads origin develop | grep develop; then
+            git fetch origin develop
+            git checkout develop
+            git pull origin develop
+          else
+            echo "⚠️ No develop branch found, skipping checkout."
+            exit 1
+          fi
 
           # Create and push the tag
           latest_commit=$(git rev-parse HEAD)
@@ -79,9 +85,10 @@ jobs:
           release_branch="release-$(date +%Y%m%d)"
           git checkout -b "$release_branch"
           git push origin "$release_branch"
+
           echo "🚀 Created release branch: $release_branch"
 
-          # Create PR for Release Branch
+          # Create PR
           gh pr create --repo "${{ github.event.inputs.repo_name }}" \
             --head "$release_branch" --base develop \
             --title "Release: $release_branch" \
@@ -99,9 +106,10 @@ jobs:
           hotfix_branch="hotfix-$(date +%Y%m%d)"
           git checkout -b "$hotfix_branch"
           git push origin "$hotfix_branch"
+
           echo "🔥 Created hotfix branch: $hotfix_branch"
 
-          # Create PR for Hotfix Branch
+          # Create PR
           gh pr create --repo "${{ github.event.inputs.repo_name }}" \
             --head "$hotfix_branch" --base develop \
             --title "Hotfix: $hotfix_branch" \
