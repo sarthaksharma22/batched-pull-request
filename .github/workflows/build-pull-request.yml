@@ -11,14 +11,10 @@ on:
         required: true
       release:
         description: "Create a release branch"
-        required: false
         type: boolean
-        default: false
       hotfix:
         description: "Create a hotfix branch"
-        required: false
         type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -30,8 +26,9 @@ jobs:
 
     steps:
       - name: Validate Repository Name
+        env:
+          REPOSITORY: ${{ github.event.inputs.repo_name }}
         run: |
-          REPOSITORY="${{ github.event.inputs.repo_name }}"
           if [[ ! "$REPOSITORY" == */* ]]; then
             echo "❌ ERROR: Repository name must be in 'owner/repo' format."
             exit 1
@@ -53,21 +50,19 @@ jobs:
           REPO_NAME=$(basename "${{ github.event.inputs.repo_name }}")
           cd $REPO_NAME
 
-          if git rev-parse --verify origin/develop >/dev/null 2>&1; then
-            git fetch origin develop
-            git checkout develop
-            git pull origin develop
-          else
-            echo "⚠️ No 'develop' branch found, skipping checkout."
-          fi
+          # Ensure develop branch is checked out and up to date
+          git fetch origin develop
+          git checkout develop
+          git pull origin develop
 
+          # Create and push the tag
           latest_commit=$(git rev-parse HEAD)
           git tag "$TAG_NAME" "$latest_commit"
           git push origin --tags
           echo "✅ Tagged latest commit with $TAG_NAME"
 
-      - name: Create Release Branch and PR (if selected)
-        if: ${{ github.event.inputs.release }}
+      - name: Create Release Branch (if selected)
+        if: github.event.inputs.release == 'true'
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
@@ -79,37 +74,29 @@ jobs:
           git push origin "$release_branch"
           echo "🚀 Created release branch: $release_branch"
 
-          # ✅ Create PR for Release Branch using Token
-          echo "🔄 Creating PR for release branch..."
-          gh pr create --repo "${{ github.event.inputs.repo_name }}" \
-            --head "$release_branch" --base develop \
-            --title "Release: $release_branch" \
-            --body "This is an automated release PR for $release_branch" \
-            --assignee "${{ github.actor }}" \
-            --reviewer "${{ github.actor }}" \
-            --token "${GH_TOKEN}" \
-            || { echo "❌ PR creation failed for $release_branch"; exit 1; }
+      - name: Authenticate with GitHub CLI
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          echo "🔑 Logging into GitHub CLI..."
+          echo "${GH_TOKEN}" | gh auth login --with-token
+          gh auth status || { echo "❌ GitHub CLI authentication failed"; exit 1; }
 
-      - name: Create Hotfix Branch and PR (if selected)
-        if: ${{ github.event.inputs.hotfix }}
+      - name: Create Pull Request for Release Branch
+        if: github.event.inputs.release == 'true'
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           REPO_NAME=$(basename "${{ github.event.inputs.repo_name }}")
           cd $REPO_NAME
 
-          hotfix_branch="hotfix-$(date +%Y%m%d)"
-          git checkout -b "$hotfix_branch"
-          git push origin "$hotfix_branch"
-          echo "🔥 Created hotfix branch: $hotfix_branch"
+          release_branch="release-$(date +%Y%m%d)"
+          echo "🔄 Creating PR for release branch..."
 
-          # ✅ Create PR for Hotfix Branch using Token
-          echo "🔄 Creating PR for hotfix branch..."
           gh pr create --repo "${{ github.event.inputs.repo_name }}" \
-            --head "$hotfix_branch" --base develop \
-            --title "Hotfix: $hotfix_branch" \
-            --body "This is an automated hotfix PR for $hotfix_branch" \
-            --assignee "${{ github.actor }}" \
-            --reviewer "${{ github.actor }}" \
-            --token "${GH_TOKEN}" \
-            || { echo "❌ PR creation failed for $hotfix_branch"; exit 1; }
+            --head "$release_branch" --base develop \
+            --title "Release: $release_branch" \
+            --body "This is an automated release PR for $release_branch" \
+            --assignee "sarthaksharma22" \
+            --reviewer "sarthaksharma22" \
+            || { echo "❌ PR creation failed for $release_branch"; exit 1; }
