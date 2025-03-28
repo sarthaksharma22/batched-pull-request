@@ -25,13 +25,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Authenticate GitHub CLI
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          gh auth status
-
       - name: Clone Repository
         env:
           REPOSITORY: ${{ github.event.inputs.repo_name }}
@@ -61,6 +54,8 @@ jobs:
 
       - name: Create Release Branch (if selected)
         if: github.event.inputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REPO_NAME=$(basename "${{ github.event.inputs.repo_name }}")
           cd $REPO_NAME
@@ -79,6 +74,8 @@ jobs:
 
       - name: Create Hotfix Branch (if selected)
         if: github.event.inputs.hotfix == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REPO_NAME=$(basename "${{ github.event.inputs.repo_name }}")
           cd $REPO_NAME
