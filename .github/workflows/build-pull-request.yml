@@ -36,11 +36,11 @@ jobs:
 
       - name: Authenticate GitHub CLI
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}  # Ensure this is a valid Personal Access Token (PAT)
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           echo "🔑 Logging into GitHub CLI..."
-          gh auth logout || true
-          gh auth status || echo "✅ Using GH_TOKEN for authentication"
+          echo $GH_TOKEN | gh auth login --with-token
+          gh auth status || { echo "❌ GitHub CLI authentication failed"; exit 1; }
 
       - name: Clone Repository
         env:
@@ -73,7 +73,7 @@ jobs:
           git push origin --tags
           echo "✅ Tagged latest commit with $TAG_NAME"
 
-      - name: Create Release Branch (if selected)
+      - name: Create Release Branch and PR (if selected)
         if: github.event.inputs.release == 'true'
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
@@ -84,17 +84,19 @@ jobs:
           release_branch="release-$(date +%Y%m%d)"
           git checkout -b "$release_branch"
           git push origin "$release_branch"
-
           echo "🚀 Created release branch: $release_branch"
 
           # Create PR for Release Branch
+          echo "🔄 Creating PR for release branch..."
           gh pr create --repo "${{ github.event.inputs.repo_name }}" \
             --head "$release_branch" --base develop \
             --title "Release: $release_branch" \
             --body "This is an automated release PR for $release_branch" \
-            --assignee "${{ github.actor }}" || echo "❌ PR creation failed for $release_branch"
+            --assignee "${{ github.actor }}" \
+            --reviewer "${{ github.actor }}" \
+            || { echo "❌ PR creation failed for $release_branch"; exit 1; }
 
-      - name: Create Hotfix Branch (if selected)
+      - name: Create Hotfix Branch and PR (if selected)
         if: github.event.inputs.hotfix == 'true'
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
@@ -105,12 +107,14 @@ jobs:
           hotfix_branch="hotfix-$(date +%Y%m%d)"
           git checkout -b "$hotfix_branch"
           git push origin "$hotfix_branch"
-
           echo "🔥 Created hotfix branch: $hotfix_branch"
 
           # Create PR for Hotfix Branch
+          echo "🔄 Creating PR for hotfix branch..."
           gh pr create --repo "${{ github.event.inputs.repo_name }}" \
             --head "$hotfix_branch" --base develop \
             --title "Hotfix: $hotfix_branch" \
             --body "This is an automated hotfix PR for $hotfix_branch" \
-            --assignee "${{ github.actor }}" || echo "❌ PR creation failed for $hotfix_branch"
+            --assignee "${{ github.actor }}" \
+            --reviewer "${{ github.actor }}" \
+            || { echo "❌ PR creation failed for $hotfix_branch"; exit 1; }
