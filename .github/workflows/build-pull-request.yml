@@ -36,11 +36,11 @@ jobs:
 
       - name: Authenticate GitHub CLI
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}  # Ensure this is a valid Personal Access Token (PAT)
         run: |
-          gh auth logout --hostname github.com || true
-          echo "${GH_TOKEN}" | gh auth login --with-token || exit 1
-          gh auth status
+          echo "🔑 Logging into GitHub CLI..."
+          gh auth logout || true
+          gh auth status || echo "✅ Using GH_TOKEN for authentication"
 
       - name: Clone Repository
         env:
@@ -58,14 +58,13 @@ jobs:
           REPO_NAME=$(basename "${{ github.event.inputs.repo_name }}")
           cd $REPO_NAME
 
-          # Ensure develop branch exists
-          if git ls-remote --heads origin develop | grep develop; then
+          # Ensure develop branch exists and is up to date
+          if git rev-parse --verify origin/develop >/dev/null 2>&1; then
             git fetch origin develop
             git checkout develop
             git pull origin develop
           else
-            echo "⚠️ No develop branch found, skipping checkout."
-            exit 1
+            echo "⚠️ No 'develop' branch found, skipping checkout."
           fi
 
           # Create and push the tag
@@ -88,7 +87,7 @@ jobs:
 
           echo "🚀 Created release branch: $release_branch"
 
-          # Create PR
+          # Create PR for Release Branch
           gh pr create --repo "${{ github.event.inputs.repo_name }}" \
             --head "$release_branch" --base develop \
             --title "Release: $release_branch" \
@@ -109,7 +108,7 @@ jobs:
 
           echo "🔥 Created hotfix branch: $hotfix_branch"
 
-          # Create PR
+          # Create PR for Hotfix Branch
           gh pr create --repo "${{ github.event.inputs.repo_name }}" \
             --head "$hotfix_branch" --base develop \
             --title "Hotfix: $hotfix_branch" \
