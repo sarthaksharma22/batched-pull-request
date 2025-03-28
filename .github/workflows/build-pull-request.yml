@@ -25,13 +25,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate Repository Name
+        env:
+          REPOSITORY: ${{ github.event.inputs.repo_name }}
+        run: |
+          if [[ ! "$REPOSITORY" == */* ]]; then
+            echo "❌ ERROR: Repository name must be in 'owner/repo' format."
+            exit 1
+          fi
+
       - name: Clone Repository
         env:
           REPOSITORY: ${{ github.event.inputs.repo_name }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "🚀 Cloning repository: $REPOSITORY"
-          git clone https://x-access-token:${GH_TOKEN}@github.com/$REPOSITORY.git
+          git clone https://x-access-token:${GH_TOKEN}@github.com/$REPOSITORY.git || { echo "❌ Repository not found!"; exit 1; }
           cd $(basename "$REPOSITORY")
 
       - name: Tag the Latest Commit
@@ -64,30 +73,4 @@ jobs:
           git checkout -b "$release_branch"
           git push origin "$release_branch"
 
-          echo "🚀 Created release branch: $release_branch"
-
-          gh pr create --repo "${{ github.event.inputs.repo_name }}" \
-            --head "$release_branch" --base develop \
-            --title "Release: $release_branch" \
-            --body "Automated release PR for $release_branch" \
-            --assignee "${{ github.actor }}" || echo "❌ PR creation failed for $release_branch"
-
-      - name: Create Hotfix Branch (if selected)
-        if: github.event.inputs.hotfix == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          REPO_NAME=$(basename "${{ github.event.inputs.repo_name }}")
-          cd $REPO_NAME
-
-          hotfix_branch="hotfix-$(date +%Y%m%d)"
-          git checkout -b "$hotfix_branch"
-          git push origin "$hotfix_branch"
-
-          echo "🔥 Created hotfix branch: $hotfix_branch"
-
-          gh pr create --repo "${{ github.event.inputs.repo_name }}" \
-            --head "$hotfix_branch" --base develop \
-            --title "Hotfix: $hotfix_branch" \
-            --body "Automated hotfix PR for $hotfix_branch" \
-            --assignee "${{ github.actor }}" || echo "❌ PR creation failed for $hotfix_branch"
+          echo "🚀 Created release branch
