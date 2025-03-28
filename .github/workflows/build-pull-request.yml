@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       repo_name:
-        description: "Repository Name (owner/name: GitHub PR Pipeline
+        description: "Repository Name (owner/name)
 
 on:
   workflow_dispatch:
