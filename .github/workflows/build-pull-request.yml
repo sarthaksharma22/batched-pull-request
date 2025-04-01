@@ -46,7 +46,7 @@ jobs:
       - name: Clone Repository
         env:
           REPOSITORY: ${{ github.event.inputs.repo_name }}
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.PATT_TOKEN }}
         run: |
           echo "🚀 Cloning repository: $REPOSITORY"
           git clone https://x-access-token:${GH_TOKEN}@github.com/$REPOSITORY.git || { echo "❌ Repository not found!"; exit 1; }
