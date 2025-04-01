@@ -36,7 +36,7 @@ jobs:
 
       - name: Authenticate GitHub CLI
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.PATT_TOKEN }}
         run: |
           echo "🔑 Logging into GitHub CLI..."
           gh auth logout || true
@@ -77,7 +77,7 @@ jobs:
       - name: Create Release Branch (if selected)
         if: github.event.inputs.release == 'true'
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.PATT_TOKEN }}
         run: |
           REPO_NAME=$(basename "${{ github.event.inputs.repo_name }}")
           cd $REPO_NAME
@@ -101,7 +101,7 @@ jobs:
       - name: Create Hotfix Branch (if selected)
         if: github.event.inputs.hotfix == 'true'
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.PATT_TOKEN }}
         run: |
           REPO_NAME=$(basename "${{ github.event.inputs.repo_name }}")
           cd $REPO_NAME
