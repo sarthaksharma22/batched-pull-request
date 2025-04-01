@@ -33,13 +33,16 @@ jobs:
             echo "❌ ERROR: Repository name must be in 'owner/repo' format."
             exit 1
           fi
+
       - name: Authenticate GitHub CLI
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}  # Ensure this is a valid Personal Access Token (PAT)
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           echo "🔑 Logging into GitHub CLI..."
           gh auth logout || true
-          gh auth status || echo "✅ Using GH_TOKEN for authentication"
+          echo "${GH_TOKEN}" | gh auth login --with-token
+          gh auth status || { echo "❌ Authentication failed!"; exit 1; }
+
       - name: Clone Repository
         env:
           REPOSITORY: ${{ github.event.inputs.repo_name }}
@@ -48,12 +51,14 @@ jobs:
           echo "🚀 Cloning repository: $REPOSITORY"
           git clone https://x-access-token:${GH_TOKEN}@github.com/$REPOSITORY.git || { echo "❌ Repository not found!"; exit 1; }
           cd $(basename "$REPOSITORY")
+
       - name: Tag the Latest Commit
         env:
           TAG_NAME: ${{ github.event.inputs.tag_name }}
         run: |
           REPO_NAME=$(basename "${{ github.event.inputs.repo_name }}")
           cd $REPO_NAME
+
           # Ensure develop branch exists and is up to date
           if git rev-parse --verify origin/develop >/dev/null 2>&1; then
             git fetch origin develop
@@ -62,11 +67,13 @@ jobs:
           else
             echo "⚠️ No 'develop' branch found, skipping checkout."
           fi
+
           # Create and push the tag
           latest_commit=$(git rev-parse HEAD)
           git tag "$TAG_NAME" "$latest_commit"
           git push origin --tags
           echo "✅ Tagged latest commit with $TAG_NAME"
+
       - name: Create Release Branch (if selected)
         if: github.event.inputs.release == 'true'
         env:
@@ -74,16 +81,23 @@ jobs:
         run: |
           REPO_NAME=$(basename "${{ github.event.inputs.repo_name }}")
           cd $REPO_NAME
+
           release_branch="release-$(date +%Y%m%d)"
           git checkout -b "$release_branch"
           git push origin "$release_branch"
           echo "🚀 Created release branch: $release_branch"
-          # Create PR for Release Branch
-          gh pr create --repo "${{ github.event.inputs.repo_name }}" \
-            --head "$release_branch" --base develop \
-            --title "Release: $release_branch" \
-            --body "This is an automated release PR for $release_branch" \
-            --assignee "${{ github.actor }}" || echo "❌ PR creation failed for $release_branch"
+
+          # Verify PR creation is possible
+          gh pr view --repo "${{ github.event.inputs.repo_name }}" "$release_branch" --json title || {
+            echo "🔄 Creating PR for release branch..."
+            gh pr create --repo "${{ github.event.inputs.repo_name }}" \
+              --head "$release_branch" --base develop \
+              --title "Release: $release_branch" \
+              --body "This is an automated release PR for $release_branch" \
+              --assignee "${{ github.actor }}" \
+              || { echo "❌ PR creation failed for $release_branch"; exit 1; }
+          }
+
       - name: Create Hotfix Branch (if selected)
         if: github.event.inputs.hotfix == 'true'
         env:
@@ -91,13 +105,19 @@ jobs:
         run: |
           REPO_NAME=$(basename "${{ github.event.inputs.repo_name }}")
           cd $REPO_NAME
+
           hotfix_branch="hotfix-$(date +%Y%m%d)"
           git checkout -b "$hotfix_branch"
           git push origin "$hotfix_branch"
           echo "🔥 Created hotfix branch: $hotfix_branch"
-          # Create PR for Hotfix Branch
-          gh pr create --repo "${{ github.event.inputs.repo_name }}" \
-            --head "$hotfix_branch" --base develop \
-            --title "Hotfix: $hotfix_branch" \
-            --body "This is an automated hotfix PR for $hotfix_branch" \
-            --assignee "${{ github.actor }}" || echo "❌ PR creation failed for $hotfix_branch"
+
+          # Verify PR creation is possible
+          gh pr view --repo "${{ github.event.inputs.repo_name }}" "$hotfix_branch" --json title || {
+            echo "🔄 Creating PR for hotfix branch..."
+            gh pr create --repo "${{ github.event.inputs.repo_name }}" \
+              --head "$hotfix_branch" --base develop \
+              --title "Hotfix: $hotfix_branch" \
+              --body "This is an automated hotfix PR for $hotfix_branch" \
+              --assignee "${{ github.actor }}" \
+              || { echo "❌ PR creation failed for $hotfix_branch"; exit 1; }
+          }
